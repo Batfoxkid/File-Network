@@ -1,0 +1,33 @@
+"Games"
+{
+	"tf"
+	{
+		"Signatures"
+		{
+			"CVEngineServer::GetPlayerNetInfo"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN14CVEngineServer16GetPlayerNetInfoEi"
+				"windows"	"\x55\x8B\xEC\x8B\x4D\x08\x83\xF9\x01\x7C\x2A\x3B\x0D\x2A\x2A\x2A\x2A\x7F\x2A\xA1\x2A\x2A\x2A\x2A\x8B\x44\x88\xFC"
+				// CVEngineServer::EmitAmbientSound -> Function Listing for CVEngineServer
+				// (To Confirm No Changes) 8 Up Function List -> CVEngineServer::IndexOfEdict -> EDICT_NUM
+				// Below CVEngineServer::IndexOfEdict is said function list
+			}
+			"CNetChan::SendFile"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN8CNetChan8SendFileEPKcj"
+				"windows"	"\x55\x8B\xEC\x57\x8B\xF9\x8D\x8F\x94\x00\x00\x00\xE8\x2A\x2A\x2A\x2A\x85\xC0\x75\x2A\xB0\x01\x5F\x5D\xC2\x08\x00\x56\x8B\x75\x08\x85\xF6"
+				// "SendFile: %s (ID %i)\n"
+			}
+			"CNetChan::IsFileInWaitingList"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN8CNetChan19IsFileInWaitingListEPKc"
+				"windows"	"\x55\x8B\xEC\x8B\x45\x08\x83\xEC\x08\x85\xC0\x0F\x84\x2A\x2A\x2A\x2A\x80\x38\x00"
+				// "CreateFragmentsFromFile: '%s' doesn't e" -> CNetChan::CreateFragmentsFromFile
+				// Top Call -> CNetChan::IsFileInWaitingList
+			}
+		}
+	}
+}
