@@ -1,6 +1,6 @@
 #include <sourcemod>
 #include <sdktools>
-//#include <dhooks>
+#include <dhooks>
 
 #pragma semicolon 1
 #pragma newdecls required
@@ -12,6 +12,7 @@
 Handle SDKGetPlayerNetInfo;
 Handle SDKSendFile;
 Handle SDKIsFileInWaitingList;
+int TransferID;
 
 methodmap CNetChan
 {
@@ -20,9 +21,9 @@ methodmap CNetChan
 		return SDKCall(SDKGetPlayerNetInfo, client);
 	}
 
-	public bool SendFile(const char[] filename, int transferID)
+	public bool SendFile(const char[] filename)
 	{
-		return SDKCall(SDKSendFile, this, filename, transferID);
+		return SDKCall(SDKSendFile, this, filename, TransferID++);
 	}
 	public bool IsFileInWaitingList(const char[] filename)
 	{
@@ -47,7 +48,7 @@ public void OnPluginStart()
 	
 	StartPrepSDKCall(SDKCall_Static);
 	PrepSDKCall_SetFromConf(gamedata, SDKConf_Signature, "CVEngineServer::GetPlayerNetInfo");
-	PrepSDKCall_AddParameter(SDKType_CBasePlayer, SDKPass_Pointer, VDECODE_FLAG_ALLOWNOTINGAME);
+	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
 	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Pointer);
 	SDKGetPlayerNetInfo = EndPrepSDKCall();
 	if(!SDKGetPlayerNetInfo)
@@ -81,8 +82,38 @@ public void OnPluginStart()
 
 	if(failed)
 		ThrowError("Gamedata failed, see error logs");
+	
+	RegAdminCmd("sm_filenetworktest", Command_Test, ADMFLAG_ROOT, "Test using send file");
 }
 
+public Action Command_Test(int client, int args)
+{
+	char buffer[PLATFORM_MAX_PATH];
+	GetCmdArgString(buffer, sizeof(buffer));
+	ReplaceString(buffer, sizeof(buffer), "\"", "");
+
+	CNetChan chan = CNetChan(client);
+	ReplyToCommand(client, "%x", chan);
+	if(chan == -1)
+	{
+		ReplyToCommand(client, "Address invalid");
+	}
+	else if(chan.IsFileInWaitingList(buffer))
+	{
+		ReplyToCommand(client, "File already in waiting list");
+	}
+	else if(chan.SendFile(buffer))
+	{
+		ReplyToCommand(client, "Sent file to client");
+	}
+	else
+	{
+		ReplyToCommand(client, "File failed to send");
+	}
+	return Plugin_Handled;
+}
+
+/*
 void CheckClient(int client)
 {
 	QueryClientConVar(client, "sv_allowupload", QueryCallback);
@@ -95,3 +126,4 @@ public void QueryCallback(QueryCookie cookie, int client, ConVarQueryResult resu
 
 	}
 }
+*/

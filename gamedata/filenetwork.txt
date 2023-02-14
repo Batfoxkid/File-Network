@@ -29,5 +29,22 @@
 				// Top Call -> CNetChan::IsFileInWaitingList
 			}
 		}
+		"Functions"
+		{
+			"CNetChan::IsFileInWaitingList"
+			{
+				"signature"	"CNetChan::IsFileInWaitingList"
+				"callconv"	"thiscall"
+				"return"	"bool"
+				"this"		"ignore"
+				"arguments"
+				{
+					"filename"
+					{
+						"type"	"stringptr"
+					}
+				}
+			}
+		}
 	}
 }
