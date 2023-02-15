@@ -47,6 +47,34 @@
 				// "CreateFragmentsFromFile: '%s' doesn't e" -> CNetChan::CreateFragmentsFromFile
 				// Top Call -> CNetChan::IsFileInWaitingList
 			}
+			"CBaseFileSystem::Size"
+			{
+				"library"	"FileSystem_Stdio"
+				"linux"		"\x55\x89\xE5\x57\x56\x53\x83\xEC\x6C\xC7\x45\xC8\x00\x00\x00\x00\xA1\x2A\x2A\x2A\x2A\xC7\x45\xCC\x00\x00\x00\x00\x8B\x5D\x08\x8B\x7D\x0C"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x14\x53\x56\x8B\xF1"
+				// "CBaseFileSystem::Size" and "rb"
+			}
+		}
+		"Functions"
+		{
+			"CBaseFileSystem::Size"
+			{
+				"signature"	"CBaseFileSystem::Size"
+				"callconv"	"thiscall"
+				"return"	"int"
+				"this"		"ignore"
+				"arguments"
+				{
+					"pFileName"
+					{
+						"type"	"stringptr"
+					}
+					"pPathID"
+					{
+						"type"	"stringptr"
+					}
+				}
+			}
 		}
 	}
 }

@@ -21,6 +21,7 @@ Handle SDKSendFile;
 Handle SDKIsFileInWaitingList;
 Address EngineAddress;
 int TransferID;
+char SendFileMatch[PLATFORM_MAX_PATH];
 
 ArrayList FileListing;
 
@@ -37,7 +38,11 @@ methodmap CNetChan
 
 	public bool SendFile(const char[] filename)
 	{
-		return SDKCall(SDKSendFile, this, filename, TransferID++);
+		strcopy(SendFileMatch, sizeof(SendFileMatch), filename);
+		bool result = SDKCall(SDKSendFile, this, filename, TransferID++);
+
+		filename[0] = 0;
+		return result;
 	}
 	public bool IsFileInWaitingList(const char[] filename)
 	{
@@ -122,6 +127,23 @@ public void OnPluginStart()
 		failed = true;
 	}
 
+	DynamicDetour detour = DynamicDetour.FromConf(gamedata, "CBaseFileSystem::Size");
+	if(detour)
+	{
+		if(!detour.Enable(Hook_Pre, OnFileSystemSize))
+		{
+			LogError("[Gamedata] Failed to enable pre detour: CBaseFileSystem::Size");
+			failed = true;
+		}
+		
+		delete detour;
+	}
+	else
+	{
+		LogError("[Gamedata] Could not find CBaseFileSystem::Size");
+		failed = true;
+	}
+
 	if(failed)
 		ThrowError("Gamedata failed, see error logs");
 	
@@ -170,6 +192,22 @@ public void OnClientDisconnect_Post(int client)
 
 	delete SendingTimer[client];
 	CurrentlySending[client][0] = 0;
+}
+
+public MRESReturn OnFileSystemSize(DHookReturn retur, DHookParam param)
+{
+	if(SendFileMatch[0] && !param.IsNull(1))
+	{
+		static char buffer[PLATFORM_MAX_PATH];
+		param.GetString(1, buffer, sizeof(buffer));
+		if(StrEqual(SendFileMatch, buffer))
+		{
+			SendFileMatch[0] = 0;
+			retur.Value = 0;
+			return MRES_Supercede;
+		}
+	}
+	return MRES_Ignored;
 }
 
 public Action Timer_SendingClient(Handle timer, int client)
