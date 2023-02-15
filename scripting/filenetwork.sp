@@ -13,6 +13,7 @@ enum struct FileEnum
 	char Filename[PLATFORM_MAX_PATH];
 	Handle Plugin;
 	Function Func;
+	any Data;
 }
 
 Handle SDKGetPlayerNetInfo;
@@ -154,7 +155,7 @@ public Action Command_Test(int client, int args)
 	return Plugin_Handled;
 }
 
-public void OnClientDisconnect(int client)
+public void OnClientDisconnect_Post(int client)
 {
 	static FileEnum info;
 
@@ -194,7 +195,7 @@ public Action Timer_SendingClient(Handle timer, int client)
 				CallSentFileFinish(info, true);
 				FileListing.Erase(i);
 				break;
-			}	
+			}
 		}
 
 		CurrentlySending[client][0] = 0;
@@ -235,6 +236,7 @@ static void CallSentFileFinish(const FileEnum info, bool success)
 		Call_PushCell(info.Client);
 		Call_PushString(info.Filename);
 		Call_PushCell(success);
+		Call_PushCell(info.Data);
 		Call_Finish();
 	}
 }
@@ -312,6 +314,7 @@ public any Native_SendFile(Handle plugin, int params)
 
 	info.Plugin = plugin;
 	info.Func = GetNativeFunction(3);
+	info.Data = GetNativeCell(4);
 
 	FileListing.PushArray(info);
 
