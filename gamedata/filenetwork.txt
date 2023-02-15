@@ -1,18 +1,37 @@
 "Games"
 {
-	"tf"
+	"#default"
 	{
+		"Keys"
+		{
+			"EngineInterface"	"VEngineServer021"
+		}
 		"Signatures"
 		{
-			"CVEngineServer::GetPlayerNetInfo"
+			"CreateInterface"
 			{
 				"library"	"engine"
-				"linux"		"@_ZN14CVEngineServer16GetPlayerNetInfoEi"
-				"windows"	"\x55\x8B\xEC\x8B\x4D\x08\x83\xF9\x01\x7C\x2A\x3B\x0D\x2A\x2A\x2A\x2A\x7F\x2A\xA1\x2A\x2A\x2A\x2A\x8B\x44\x88\xFC"
-				// CVEngineServer::EmitAmbientSound -> Function Listing for CVEngineServer
-				// (To Confirm No Changes) 8 Up Function List -> CVEngineServer::IndexOfEdict -> EDICT_NUM
-				// Below CVEngineServer::IndexOfEdict is said function list
+				"windows"	"@CreateInterface"
+				"linux"		"@CreateInterface"
 			}
+		}
+        "Offsets"
+        {
+            "GetPlayerNetInfo"
+            {
+                "windows"    "20"
+                "linux"      "20"
+            }
+        }
+	}
+	"tf"
+	{
+		"Keys"
+		{
+			"EngineInterface"	"VEngineServer023"
+		}
+		"Signatures"
+		{
 			"CNetChan::SendFile"
 			{
 				"library"	"engine"
@@ -27,23 +46,6 @@
 				"windows"	"\x55\x8B\xEC\x8B\x45\x08\x83\xEC\x08\x85\xC0\x0F\x84\x2A\x2A\x2A\x2A\x80\x38\x00"
 				// "CreateFragmentsFromFile: '%s' doesn't e" -> CNetChan::CreateFragmentsFromFile
 				// Top Call -> CNetChan::IsFileInWaitingList
-			}
-		}
-		"Functions"
-		{
-			"CNetChan::IsFileInWaitingList"
-			{
-				"signature"	"CNetChan::IsFileInWaitingList"
-				"callconv"	"thiscall"
-				"return"	"bool"
-				"this"		"ignore"
-				"arguments"
-				{
-					"filename"
-					{
-						"type"	"stringptr"
-					}
-				}
 			}
 		}
 	}

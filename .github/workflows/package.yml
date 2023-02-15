@@ -1,0 +1,44 @@
+name: Package
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches: main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '*')"
+    
+    steps:
+      - name: Install Checkout
+        uses: actions/checkout@v1
+      
+      - name: Install Setup SP
+        uses: rumblefrog/setup-sp@master
+        with:
+          version: '1.11.x'
+      
+      - name: Setup Workflow
+        run: |
+          echo "PLUGIN_VERSION<<EOF" >> $GITHUB_ENV
+          git rev-list --count HEAD >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+          echo "SCRIPTS_PATH=scripting" >> $GITHUB_ENV
+          cd scripting
+          sed -i -e 's/#define PLUGIN_VERSION.*".*"/#define PLUGIN_VERSION "'$PLUGIN_VERSION'"/g' filenetwork.sp
+      
+      - name: Compile
+        run: |
+          spcomp -E -O2 -v2 -o "filenetwork" filenetwork.sp
+        working-directory: ${{ env.SCRIPTS_PATH }}
+      
+      - name: Release
+        uses: softprops/action-gh-release@master
+        with:
+          tag_name: v${{env.PLUGIN_VERSION}}
+          files: |
+            scripting/filenetwork.smx
+            gamedata/filenetwork.txt

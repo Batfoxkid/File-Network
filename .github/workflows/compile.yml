@@ -1,0 +1,33 @@
+name: Compile
+
+on:
+  pull_request:
+    branches: main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        sm-version: [ '1.11.x', '1.12.x']
+    
+    steps:
+      - name: Install Checkout
+        uses: actions/checkout@v1
+      
+      - name: Install Setup SP ${{ matrix.sm-version }}
+        uses: rumblefrog/setup-sp@master
+        with:
+          version: ${{ matrix.sm-version }}
+      
+      - name: Setup Workflow
+        run: |
+          echo "PLUGIN_VERSION<<EOF" >> $GITHUB_ENV
+          git rev-list --count HEAD >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+          echo "SCRIPTS_PATH=scripting" >> $GITHUB_ENV
+      
+      - name: Compile ${{ matrix.sm-version }}
+        run: |
+          spcomp -E -O2 -v2 filenetwork.sp
+        working-directory: ${{ env.SCRIPTS_PATH }}
