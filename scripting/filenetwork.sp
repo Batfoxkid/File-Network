@@ -172,6 +172,15 @@ public void OnClientDisconnect_Post(int client)
 	CurrentlySending[client][0] = 0;
 }
 
+public void OnNotifyPluginUnloaded(Handle plugin)
+{
+	int match = -1;
+	while((match = FileListing.FindValue(plugin, FileEnum::Plugin)) != -1)
+	{
+		FileListing.Erase(match);
+	}
+}
+
 public Action Timer_SendingClient(Handle timer, int client)
 {
 	CNetChan chan = CNetChan(client);
@@ -192,8 +201,8 @@ public Action Timer_SendingClient(Handle timer, int client)
 			FileListing.GetArray(i, info);
 			if(info.Client == client && StrEqual(info.Filename, CurrentlySending[client], false))
 			{
-				CallSentFileFinish(info, true);
 				FileListing.Erase(i);
+				CallSentFileFinish(info, true);
 				break;
 			}
 		}
@@ -215,8 +224,8 @@ public Action Timer_SendingClient(Handle timer, int client)
 			else
 			{
 				// Failed reasons tend to be bad names, bad sizes, etc.
-				CallSentFileFinish(info, false);
 				FileListing.Erase(i);
+				CallSentFileFinish(info, false);
 			}
 
 			return Plugin_Continue;
