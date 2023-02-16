@@ -18,6 +18,7 @@ enum struct FileEnum
 
 Handle SDKGetPlayerNetInfo;
 Handle SDKSendFile;
+Handle SDKRequestFile;
 Handle SDKIsFileInWaitingList;
 Address EngineAddress;
 int TransferID;
@@ -38,11 +39,13 @@ methodmap CNetChan
 
 	public bool SendFile(const char[] filename)
 	{
-		strcopy(SendFileMatch, sizeof(SendFileMatch), filename);
 		bool result = SDKCall(SDKSendFile, this, filename, TransferID++);
-
-		filename[0] = 0;
+		strcopy(SendFileMatch, sizeof(SendFileMatch), filename);
 		return result;
+	}
+	public int RequestFile(const char[] filename)
+	{
+		return SDKCall(SDKRequestFile, this, filename);
 	}
 	public bool IsFileInWaitingList(const char[] filename)
 	{
@@ -53,7 +56,7 @@ methodmap CNetChan
 public Plugin myinfo =
 {
 	name		=	"File Network",
-	author		=	"Batfoxkid",
+	author		=	"Batfoxkid & Artvin",
 	description	=	"But what if, no loading screen",
 	version		=	PLUGIN_VERSION,
 	url			=	"github.com/Batfoxkid/File-Network"
@@ -117,6 +120,17 @@ public void OnPluginStart()
 	}
 	
 	StartPrepSDKCall(SDKCall_Raw);
+	PrepSDKCall_SetFromConf(gamedata, SDKConf_Signature, "CNetChan::RequestFile");
+	PrepSDKCall_AddParameter(SDKType_String, SDKPass_Pointer);
+	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_ByValue);
+	SDKRequestFile = EndPrepSDKCall();
+	if(!SDKRequestFile)
+	{
+		LogError("[Gamedata] Could not find CNetChan::RequestFile");
+		failed = true;
+	}
+	
+	StartPrepSDKCall(SDKCall_Raw);
 	PrepSDKCall_SetFromConf(gamedata, SDKConf_Signature, "CNetChan::IsFileInWaitingList");
 	PrepSDKCall_AddParameter(SDKType_String, SDKPass_Pointer);
 	PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_ByValue);
@@ -127,31 +141,15 @@ public void OnPluginStart()
 		failed = true;
 	}
 
-	DynamicDetour detour = DynamicDetour.FromConf(gamedata, "CBaseFileSystem::Size");
-	if(detour)
-	{
-		if(!detour.Enable(Hook_Pre, OnFileSystemSize))
-		{
-			LogError("[Gamedata] Failed to enable pre detour: CBaseFileSystem::Size");
-			failed = true;
-		}
-		
-		delete detour;
-	}
-	else
-	{
-		LogError("[Gamedata] Could not find CBaseFileSystem::Size");
-		failed = true;
-	}
-
 	if(failed)
 		ThrowError("Gamedata failed, see error logs");
 	
 	FileListing = new ArrayList(sizeof(FileEnum));
-	RegAdminCmd("sm_filenetworktest", Command_Test, ADMFLAG_ROOT, "Test using send file");
+	RegAdminCmd("sm_filenet_send", Command_TestSend, ADMFLAG_ROOT, "Test using send file");
+	RegAdminCmd("sm_filenet_request", Command_TestRequest, ADMFLAG_ROOT, "Test using request file");
 }
 
-public Action Command_Test(int client, int args)
+public Action Command_TestSend(int client, int args)
 {
 	char buffer[PLATFORM_MAX_PATH];
 	GetCmdArgString(buffer, sizeof(buffer));
@@ -177,6 +175,25 @@ public Action Command_Test(int client, int args)
 	return Plugin_Handled;
 }
 
+public Action Command_TestRequest(int client, int args)
+{
+	char buffer[PLATFORM_MAX_PATH];
+	GetCmdArgString(buffer, sizeof(buffer));
+	ReplaceString(buffer, sizeof(buffer), "\"", "");
+
+	CNetChan chan = CNetChan(client);
+	if(!chan)
+	{
+		ReplyToCommand(client, "Address invalid");
+	}
+	else
+	{
+		chan.RequestFile(buffer);
+		ReplyToCommand(client, "Requested file from client");
+	}
+	return Plugin_Handled;
+}
+
 public void OnClientDisconnect_Post(int client)
 {
 	static FileEnum info;
@@ -192,22 +209,6 @@ public void OnClientDisconnect_Post(int client)
 
 	delete SendingTimer[client];
 	CurrentlySending[client][0] = 0;
-}
-
-public MRESReturn OnFileSystemSize(DHookReturn retur, DHookParam param)
-{
-	if(SendFileMatch[0] && !param.IsNull(1))
-	{
-		static char buffer[PLATFORM_MAX_PATH];
-		param.GetString(1, buffer, sizeof(buffer));
-		if(StrEqual(SendFileMatch, buffer))
-		{
-			SendFileMatch[0] = 0;
-			retur.Value = 0;
-			return MRES_Supercede;
-		}
-	}
-	return MRES_Ignored;
 }
 
 public Action Timer_SendingClient(Handle timer, int client)
