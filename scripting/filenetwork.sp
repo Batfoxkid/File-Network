@@ -14,19 +14,26 @@ enum struct FileEnum
 	Handle Plugin;
 	Function Func;
 	any Data;
+
+	int Id;
 }
 
 Handle SDKGetPlayerNetInfo;
 Handle SDKSendFile;
+Handle SDKRequestFile;
 Handle SDKIsFileInWaitingList;
+Handle SDKGetNetChannel;
 Address EngineAddress;
+
+// Sending
 int TransferID;
-
-ArrayList FileListing;
-
+ArrayList SendListing;
 bool InQuery[MAXPLAYERS+1];
 Handle SendingTimer[MAXPLAYERS+1];
 char CurrentlySending[MAXPLAYERS+1][PLATFORM_MAX_PATH];
+
+// Requesting
+ArrayList RequestListing;
 
 methodmap CNetChan
 {
@@ -38,6 +45,10 @@ methodmap CNetChan
 	public bool SendFile(const char[] filename)
 	{
 		return SDKCall(SDKSendFile, this, filename, TransferID++);
+	}
+	public int RequestFile(const char[] filename)
+	{
+		return SDKCall(SDKRequestFile, this, filename);
 	}
 	public bool IsFileInWaitingList(const char[] filename)
 	{
@@ -57,6 +68,7 @@ public Plugin myinfo =
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
 	CreateNative("FileNet_SendFile", Native_SendFile);
+	CreateNative("FileNet_RequestFile", Native_RequestFile);
 	CreateNative("FileNet_IsFileInWaitingList", Native_IsFileInWaitingList);
 	
 	RegPluginLibrary("filenetwork");
@@ -112,6 +124,17 @@ public void OnPluginStart()
 	}
 	
 	StartPrepSDKCall(SDKCall_Raw);
+	PrepSDKCall_SetFromConf(gamedata, SDKConf_Signature, "CNetChan::RequestFile");
+	PrepSDKCall_AddParameter(SDKType_String, SDKPass_Pointer);
+	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_ByValue);
+	SDKRequestFile = EndPrepSDKCall();
+	if(!SDKRequestFile)
+	{
+		LogError("[Gamedata] Could not find CNetChan::RequestFile");
+		failed = true;
+	}
+	
+	StartPrepSDKCall(SDKCall_Raw);
 	PrepSDKCall_SetFromConf(gamedata, SDKConf_Signature, "CNetChan::IsFileInWaitingList");
 	PrepSDKCall_AddParameter(SDKType_String, SDKPass_Pointer);
 	PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_ByValue);
@@ -121,15 +144,61 @@ public void OnPluginStart()
 		LogError("[Gamedata] Could not find CNetChan::IsFileInWaitingList");
 		failed = true;
 	}
+	
+	StartPrepSDKCall(SDKCall_Raw);
+	PrepSDKCall_SetFromConf(gamedata, SDKConf_Signature, "CBaseClient::GetNetChannel");
+	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_ByValue);
+	SDKGetNetChannel = EndPrepSDKCall();
+	if(!SDKGetNetChannel)
+	{
+		LogError("[Gamedata] Could not find CBaseClient::GetNetChannel");
+		failed = true;
+	}
+
+	DynamicDetour detour = DynamicDetour.FromConf(gamedata, "CGameClient::FileReceived");
+	if(detour)
+	{
+		if(!detour.Enable(Hook_Post, OnFileReceived))
+		{
+			LogError("[Gamedata] Failed to enable detour: CGameClient::FileReceived");
+			failed = true;
+		}
+		
+		delete detour;
+	}
+	else
+	{
+		LogError("[Gamedata] Could not find CGameClient::FileReceived");
+		failed = true;
+	}
+
+	detour = DynamicDetour.FromConf(gamedata, "CGameClient::FileDenied");
+	if(detour)
+	{
+		if(!detour.Enable(Hook_Post, OnFileDenied))
+		{
+			LogError("[Gamedata] Failed to enable detour: CGameClient::FileDenied");
+			failed = true;
+		}
+		
+		delete detour;
+	}
+	else
+	{
+		LogError("[Gamedata] Could not find CGameClient::FileDenied");
+		failed = true;
+	}
 
 	if(failed)
 		ThrowError("Gamedata failed, see error logs");
 	
-	FileListing = new ArrayList(sizeof(FileEnum));
-	RegAdminCmd("sm_filenetworktest", Command_Test, ADMFLAG_ROOT, "Test using send file");
+	SendListing = new ArrayList(sizeof(FileEnum));
+	RequestListing = new ArrayList(sizeof(FileEnum));
+	RegAdminCmd("sm_filenet_send", Command_TestSend, ADMFLAG_ROOT, "Test using send file");
+	RegAdminCmd("sm_filenet_request", Command_TestRequest, ADMFLAG_ROOT, "Test using request file");
 }
 
-public Action Command_Test(int client, int args)
+public Action Command_TestSend(int client, int args)
 {
 	char buffer[PLATFORM_MAX_PATH];
 	GetCmdArgString(buffer, sizeof(buffer));
@@ -155,30 +224,89 @@ public Action Command_Test(int client, int args)
 	return Plugin_Handled;
 }
 
+public Action Command_TestRequest(int client, int args)
+{
+	char buffer[PLATFORM_MAX_PATH];
+	GetCmdArgString(buffer, sizeof(buffer));
+	ReplaceString(buffer, sizeof(buffer), "\"", "");
+
+	CNetChan chan = CNetChan(client);
+	if(!chan)
+	{
+		ReplyToCommand(client, "Address invalid");
+	}
+	else
+	{
+		chan.RequestFile(buffer);
+		ReplyToCommand(client, "Requested file from client");
+	}
+	return Plugin_Handled;
+}
+
 public void OnClientDisconnect_Post(int client)
 {
 	static FileEnum info;
 
 	int match = -1;
-	while((match = FileListing.FindValue(client, FileEnum::Client)) != -1)
+	while((match = SendListing.FindValue(client, FileEnum::Client)) != -1)
 	{
-		FileListing.GetArray(match, info);
-		CallSentFileFinish(info, false);
+		SendListing.GetArray(match, info);
+		SendListing.Erase(match);
 
-		FileListing.Erase(match);
+		CallSentFileFinish(info, false);
+	}
+
+	match = -1;
+	while((match = RequestListing.FindValue(client, FileEnum::Client)) != -1)
+	{
+		RequestListing.GetArray(match, info);
+		RequestListing.Erase(match);
+
+		CallRequestFileFinish(info, false);
 	}
 
 	delete SendingTimer[client];
 	CurrentlySending[client][0] = 0;
 }
 
-public void OnNotifyPluginUnloaded(Handle plugin)
+public MRESReturn OnFileReceived(Address address, DHookParam param)
 {
-	int match = -1;
-	while((match = FileListing.FindValue(plugin, FileEnum::Plugin)) != -1)
+	int id = param.Get(2);
+	CNetChan chan = SDKCall(SDKGetNetChannel, address);
+
+	int length = RequestListing.Length;
+	for(int i; i < length; i++)
 	{
-		FileListing.Erase(match);
+		static FileEnum info;
+		RequestListing.GetArray(i, info);
+		if(info.Id == id && chan == CNetChan(info.Client))
+		{
+			RequestListing.Erase(i);
+			CallRequestFileFinish(info, true);
+			break;
+		}
 	}
+	return MRES_Ignored;
+}
+
+public MRESReturn OnFileDenied(Address address, DHookParam param)
+{
+	int id = param.Get(2);
+	CNetChan chan = SDKCall(SDKGetNetChannel, address);
+
+	int length = RequestListing.Length;
+	for(int i; i < length; i++)
+	{
+		static FileEnum info;
+		RequestListing.GetArray(i, info);
+		if(info.Id == id && chan == CNetChan(info.Client))
+		{
+			RequestListing.Erase(i);
+			CallRequestFileFinish(info, false);
+			break;
+		}
+	}
+	return MRES_Ignored;
 }
 
 public Action Timer_SendingClient(Handle timer, int client)
@@ -194,14 +322,14 @@ public Action Timer_SendingClient(Handle timer, int client)
 			return Plugin_Continue;
 		
 		// We finished this file
-		int length = FileListing.Length;
+		int length = SendListing.Length;
 		for(int i; i < length; i++)
 		{
 			static FileEnum info;
-			FileListing.GetArray(i, info);
+			SendListing.GetArray(i, info);
 			if(info.Client == client && StrEqual(info.Filename, CurrentlySending[client], false))
 			{
-				FileListing.Erase(i);
+				SendListing.Erase(i);
 				CallSentFileFinish(info, true);
 				break;
 			}
@@ -210,11 +338,11 @@ public Action Timer_SendingClient(Handle timer, int client)
 		CurrentlySending[client][0] = 0;
 	}
 
-	int length = FileListing.Length;
+	int length = SendListing.Length;
 	for(int i; i < length; i++)
 	{
 		static FileEnum info;
-		FileListing.GetArray(i, info);
+		SendListing.GetArray(i, info);
 		if(info.Client == client)
 		{
 			if(chan.SendFile(info.Filename))
@@ -224,7 +352,7 @@ public Action Timer_SendingClient(Handle timer, int client)
 			else
 			{
 				// Failed reasons tend to be bad names, bad sizes, etc.
-				FileListing.Erase(i);
+				SendListing.Erase(i);
 				CallSentFileFinish(info, false);
 			}
 
@@ -250,9 +378,23 @@ static void CallSentFileFinish(const FileEnum info, bool success)
 	}
 }
 
+static void CallRequestFileFinish(const FileEnum info, bool success)
+{
+	if(info.Func && info.Func != INVALID_FUNCTION)
+	{
+		Call_StartFunction(info.Plugin, info.Func);
+		Call_PushCell(info.Client);
+		Call_PushString(info.Filename);
+		Call_PushCell(info.Id);
+		Call_PushCell(success);
+		Call_PushCell(info.Data);
+		Call_Finish();
+	}
+}
+
 void StartNative()
 {
-	if(!FileListing)
+	if(!SendListing)
 		ThrowNativeError(SP_ERROR_NATIVE, "Please wait until OnAllPluginsLoaded");
 }
 
@@ -298,11 +440,11 @@ int GetNativeClient(int param)
 
 bool FileExistsForClient(int client, const char[] filename)
 {
-	int length = FileListing.Length;
+	int length = SendListing.Length;
 	for(int i; i < length; i++)
 	{
 		static FileEnum info;
-		FileListing.GetArray(i, info);
+		SendListing.GetArray(i, info);
 		if(info.Client == client)
 		{
 			if(StrEqual(info.Filename, filename, false))
@@ -325,10 +467,31 @@ public any Native_SendFile(Handle plugin, int params)
 	info.Func = GetNativeFunction(3);
 	info.Data = GetNativeCell(4);
 
-	FileListing.PushArray(info);
+	SendListing.PushArray(info);
 
 	StartSendingClient(info.Client);
 	return true;
+}
+
+public any Native_RequestFile(Handle plugin, int params)
+{
+	StartNative();
+
+	FileEnum info;
+	info.Client = GetNativeClient(1);
+	GetNativeString(2, info.Filename, sizeof(info.Filename));
+
+	info.Plugin = plugin;
+	info.Func = GetNativeFunction(3);
+	info.Data = GetNativeCell(4);
+
+	CNetChan chan = CNetChan(info.Client);
+	if(!chan)
+		ThrowError("Client address is invalid");
+	
+	info.Id = chan.RequestFile(info.Filename);
+	RequestListing.PushArray(info);
+	return info.Id;
 }
 
 public any Native_IsFileInWaitingList(Handle plugin, int params)

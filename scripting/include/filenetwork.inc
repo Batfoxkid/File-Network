@@ -7,7 +7,7 @@
 #pragma newdecls required
 
 /**
- * Called when parsing is started.
+ * Called when file sending is finished
  */
 typeset FileNet_SendFileResult
 {
@@ -29,6 +29,37 @@ typeset FileNet_SendFileResult
 	 * @noreturn
 	 */
 	function void(int client, const char[] file, bool success);
+};
+
+/**
+ * Ccalled when file request is finished
+ */
+typeset FileNet_RequestFileResult
+{
+	/**
+	 * @note	May be written to the downloads folder
+	 * 
+	 * @param client	Client index
+	 * @param file		Filepath of requested file
+	 * @param id		Request ID
+	 * @param success	If the file was sent
+	 * @param data		Value that was passed
+	 * 
+	 * @noreturn
+	 */
+	function void(int client, const char[] file, int id, bool success, any data);
+
+	/**
+	 * @note	May be written to the downloads folder
+	 * 
+	 * @param client	Client index
+	 * @param file		Filepath of requested file
+	 * @param id		Request ID
+	 * @param success	If the file was sent
+	 * 
+	 * @noreturn
+	 */
+	function void(int client, const char[] file, int id, bool success);
 };
 
 /**
@@ -55,6 +86,23 @@ native bool FileNet_IsFileInWaitingList(int client, const char[] file);
  */
 native bool FileNet_SendFile(int client, const char[] file, FileNet_SendFileResult callback = INVALID_FUNCTION, any data = 0);
 
+/**
+ * Requests a file to be sent from the client
+ * 
+ * @note	Callback may not always be called, this is due to missing callbacks for cases:
+ * @note	In this case, the callback will only be called when the client disconnects
+ * 
+ * @param client	Client index
+ * @param file		Filepath of requested file
+ * @param callback	Optional callback when file is done
+ * @param data		Optional value to pass to the callback function
+ * 
+ * @error			Invalid client index, client is not in game, or a fake client
+ * 
+ * @return			Unique request ID given by the engine per session
+ */
+native int FileNet_RequestFile(int client, const char[] file, FileNet_RequestFileResult callback = INVALID_FUNCTION, any data = 0);
+
 public SharedPlugin __pl_filenetwork =
 {
 	name = "filenetwork",
@@ -71,5 +119,6 @@ public void __pl_filenetwork_SetNTVOptional()
 {
 	MarkNativeAsOptional("FileNet_SendFile");
 	MarkNativeAsOptional("FileNet_IsFileInWaitingList");
+	MarkNativeAsOptional("FileNet_RequestFile");
 }
 #endif
