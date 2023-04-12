@@ -108,9 +108,8 @@ native int FileNet_RequestFile(int client, const char[] file, FileNet_RequestFil
  * 
  * @param client	Client index
  * 
- * @error			Invalid client index, client is not in game, or a fake client
  * 
- * @return			Address of the CNetChan object
+ * @return			Address of the CNetChan object on success, Address_Null otherwise
  */
 native Address FileNet_GetNetChanPtr(int client);
 

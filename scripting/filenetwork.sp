@@ -520,7 +520,7 @@ public any Native_GetNetChanPtr(Handle plugin, int params)
 	
 	CNetChan chan = CNetChan(client);
 	if(!chan)
-		ThrowError("Native_GetNetChanPtr: Client address is invalid");
+		return Address_Null;
 		
 	return chan;
 }
