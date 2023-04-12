@@ -70,6 +70,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("FileNet_SendFile", Native_SendFile);
 	CreateNative("FileNet_RequestFile", Native_RequestFile);
 	CreateNative("FileNet_IsFileInWaitingList", Native_IsFileInWaitingList);
+	CreateNative("FileNet_GetNetChanPtr", Native_GetNetChanPtr);
 	
 	RegPluginLibrary("filenetwork");
 	return APLRes_Success;
@@ -487,7 +488,7 @@ public any Native_RequestFile(Handle plugin, int params)
 
 	CNetChan chan = CNetChan(info.Client);
 	if(!chan)
-		ThrowError("Client address is invalid");
+		ThrowError("Native_RequestFile: Client address is invalid");
 	
 	info.Id = chan.RequestFile(info.Filename);
 	RequestListing.PushArray(info);
@@ -509,4 +510,17 @@ public any Native_IsFileInWaitingList(Handle plugin, int params)
 	GetNativeString(2, filename, length);
 	
 	return FileExistsForClient(client, filename);
+}
+
+public any Native_GetNetChanPtr(Handle plugin, int params)
+{
+	StartNative();
+	
+	int client = GetNativeCell(1);
+	
+	CNetChan chan = CNetChan(client);
+	if(!chan)
+		return Address_Null;
+		
+	return chan;
 }

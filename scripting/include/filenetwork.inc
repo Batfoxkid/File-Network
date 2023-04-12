@@ -103,6 +103,16 @@ native bool FileNet_SendFile(int client, const char[] file, FileNet_SendFileResu
  */
 native int FileNet_RequestFile(int client, const char[] file, FileNet_RequestFileResult callback = INVALID_FUNCTION, any data = 0);
 
+/**
+ * Gets the CNetChan object of a specific client
+ * 
+ * @param client	Client index
+ * 
+ * 
+ * @return			Address of the CNetChan object on success, Address_Null otherwise
+ */
+native Address FileNet_GetNetChanPtr(int client);
+
 public SharedPlugin __pl_filenetwork =
 {
 	name = "filenetwork",
@@ -120,5 +130,6 @@ public void __pl_filenetwork_SetNTVOptional()
 	MarkNativeAsOptional("FileNet_SendFile");
 	MarkNativeAsOptional("FileNet_IsFileInWaitingList");
 	MarkNativeAsOptional("FileNet_RequestFile");
+	MarkNativeAsOptional("FileNet_GetNetChanPtr");
 }
 #endif
