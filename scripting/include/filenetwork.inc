@@ -79,12 +79,13 @@ native bool FileNet_IsFileInWaitingList(int client, const char[] file);
  * @param file		Filepath of sent file
  * @param callback	Optional callback when file is done
  * @param data		Optional value to pass to the callback function
+ * @param skip		Skip querying client sv_allowupload value before queuying the file
  * 
  * @error			Invalid client index, client is not in game, or a fake client
  * 
  * @return			True if the file is now queued to be sent, false otherwise
  */
-native bool FileNet_SendFile(int client, const char[] file, FileNet_SendFileResult callback = INVALID_FUNCTION, any data = 0);
+native bool FileNet_SendFile(int client, const char[] file, FileNet_SendFileResult callback = INVALID_FUNCTION, any data = 0, bool skip = false);
 
 /**
  * Requests a file to be sent from the client

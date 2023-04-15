@@ -14,6 +14,7 @@ enum struct FileEnum
 	Handle Plugin;
 	Function Func;
 	any Data;
+	bool SkipCvar;
 
 	int Id;
 }
@@ -399,11 +400,21 @@ void StartNative()
 		ThrowNativeError(SP_ERROR_NATIVE, "Please wait until OnAllPluginsLoaded");
 }
 
-void StartSendingClient(int client)
+void StartSendingClient(int client, bool skipCvarCheck = false)
 {
 	// Clients need sv_allowupload in order for this to work, sorry CSGO fans
-	if(!InQuery[client] && QueryClientConVar(client, "sv_allowupload", QueryCallback) != QUERYCOOKIE_FAILED)
-		InQuery[client] = true;
+	
+	if(!skipCvarCheck)  //if we want to check the cvar value (default behavior)
+	{
+		if(!InQuery[client] && QueryClientConVar(client, "sv_allowupload", QueryCallback) != QUERYCOOKIE_FAILED)
+			InQuery[client] = true;
+	}
+	else //skip the cvar query
+	{
+			SendingTimer[client] = CreateTimer(0.5, Timer_SendingClient, client, TIMER_REPEAT);
+			Timer_SendingClient(null, client);
+	}
+
 }
 
 public void QueryCallback(QueryCookie cookie, int client, ConVarQueryResult result, const char[] cvarName, const char[] cvarValue, any value)
@@ -467,10 +478,11 @@ public any Native_SendFile(Handle plugin, int params)
 	info.Plugin = plugin;
 	info.Func = GetNativeFunction(3);
 	info.Data = GetNativeCell(4);
+	info.SkipCvar = GetNativeCell(5);
 
 	SendListing.PushArray(info);
 
-	StartSendingClient(info.Client);
+	StartSendingClient(info.Client, info.SkipCvar);
 	return true;
 }
 
