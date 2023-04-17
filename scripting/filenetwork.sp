@@ -14,8 +14,6 @@ enum struct FileEnum
 	Handle Plugin;
 	Function Func;
 	any Data;
-	bool SkipCvar;
-
 	int Id;
 }
 
@@ -29,7 +27,6 @@ Address EngineAddress;
 // Sending
 int TransferID;
 ArrayList SendListing;
-bool InQuery[MAXPLAYERS+1];
 Handle SendingTimer[MAXPLAYERS+1];
 char CurrentlySending[MAXPLAYERS+1][PLATFORM_MAX_PATH];
 
@@ -400,39 +397,10 @@ void StartNative()
 		ThrowNativeError(SP_ERROR_NATIVE, "Please wait until OnAllPluginsLoaded");
 }
 
-void StartSendingClient(int client, bool skipCvarCheck = false)
+void StartSendingClient(int client)
 {
-	// Clients need sv_allowupload in order for this to work, sorry CSGO fans
-	
-	if(!skipCvarCheck)  //if we want to check the cvar value (default behavior)
-	{
-		if(!InQuery[client] && QueryClientConVar(client, "sv_allowupload", QueryCallback) != QUERYCOOKIE_FAILED)
-			InQuery[client] = true;
-	}
-	else //skip the cvar query
-	{
-			SendingTimer[client] = CreateTimer(0.5, Timer_SendingClient, client, TIMER_REPEAT);
-			Timer_SendingClient(null, client);
-	}
-
-}
-
-public void QueryCallback(QueryCookie cookie, int client, ConVarQueryResult result, const char[] cvarName, const char[] cvarValue, any value)
-{
-	if(!SendingTimer[client] && IsClientInGame(client))
-	{
-		if(result == ConVarQuery_Okay && StringToInt(cvarValue))
-		{
-			SendingTimer[client] = CreateTimer(0.5, Timer_SendingClient, client, TIMER_REPEAT);
-			Timer_SendingClient(null, client);
-		}
-		else
-		{
-			PrintToChat(client, "[SM] The server is trying to send you a file, enable sv_allowupload to allow this process");
-		}
-	}
-
-	InQuery[client] = false;
+	SendingTimer[client] = CreateTimer(0.5, Timer_SendingClient, client, TIMER_REPEAT);
+	Timer_SendingClient(null, client);
 }
 
 int GetNativeClient(int param)
@@ -478,11 +446,10 @@ public any Native_SendFile(Handle plugin, int params)
 	info.Plugin = plugin;
 	info.Func = GetNativeFunction(3);
 	info.Data = GetNativeCell(4);
-	info.SkipCvar = GetNativeCell(5);
 
 	SendListing.PushArray(info);
 
-	StartSendingClient(info.Client, info.SkipCvar);
+	StartSendingClient(info.Client);
 	return true;
 }
 
