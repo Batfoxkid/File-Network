@@ -84,7 +84,7 @@ native bool FileNet_IsFileInWaitingList(int client, const char[] file);
  * 
  * @return			True if the file is now queued to be sent, false otherwise
  */
-native bool FileNet_SendFile(int client, const char[] file, FileNet_SendFileResult callback = INVALID_FUNCTION, any data = 0, bool skip = false);
+native bool FileNet_SendFile(int client, const char[] file, FileNet_SendFileResult callback = INVALID_FUNCTION, any data = 0);
 
 /**
  * Requests a file to be sent from the client
