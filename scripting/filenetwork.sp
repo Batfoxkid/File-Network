@@ -25,6 +25,8 @@ Handle SDKIsFileInWaitingList;
 Handle SDKGetNetChannel;
 Address EngineAddress;
 
+Address m_NetChannelOffset;
+
 // Sending
 int TransferID;
 ArrayList SendListing;
@@ -162,6 +164,13 @@ public void OnPluginStart()
         }
     }
 
+    if (g_EngineVersion == Engine_CSGO)
+    {
+        m_NetChannelOffset = gamedata.GetAddress("CBaseClient::m_NetChannelOffset");
+        if(!m_NetChannelOffset)
+            SetFailState("[Gamedata] Could not find 'CBaseClient::m_NetChannelOffset'");
+    }
+
     DynamicDetour detour = DynamicDetour.FromConf(gamedata, "CGameClient::FileReceived");
     if(detour)
     {
@@ -280,12 +289,26 @@ public void OnClientDisconnect_Post(int client)
 public MRESReturn OnFileReceived(Address address, DHookParam param)
 {
     int id = param.Get(2);
+
+    CNetChan chan;
+    switch (g_EngineVersion)
+    {
+        case Engine_CSGO:
+        {
+            chan = LoadFromAddress(view_as<Address>(address + view_as<Address>(524)), NumberType_Int32);
+        }
+        default:
+        {
+            chan = SDKCall(SDKGetNetChannel, address);
+        }
+    }
+
     int length = RequestListing.Length;
     for(int i; i < length; i++)
     {
         static FileEnum info;
         RequestListing.GetArray(i, info);
-        if(info.Id == id)
+        if(info.Id == id && chan == CNetChan(info.Client))
         {
             RequestListing.Erase(i);
             CallRequestFileFinish(info, true);
@@ -298,12 +321,26 @@ public MRESReturn OnFileReceived(Address address, DHookParam param)
 public MRESReturn OnFileDenied(Address address, DHookParam param)
 {
     int id = param.Get(2);
+
+    CNetChan chan;
+    switch (g_EngineVersion)
+    {
+        case Engine_CSGO:
+        {
+            chan = LoadFromAddress(view_as<Address>(address + view_as<Address>(524)), NumberType_Int32);
+        }
+        default:
+        {
+            chan = SDKCall(SDKGetNetChannel, address);
+        }
+    }
+
     int length = RequestListing.Length;
     for(int i; i < length; i++)
     {
         static FileEnum info;
         RequestListing.GetArray(i, info);
-        if(info.Id == id)
+        if(info.Id == id && chan == CNetChan(info.Client))
         {
             RequestListing.Erase(i);
             CallRequestFileFinish(info, false);
