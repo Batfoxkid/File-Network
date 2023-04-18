@@ -71,7 +71,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
     CreateNative("FileNet_SendFile", Native_SendFile);
     CreateNative("FileNet_RequestFile", Native_RequestFile);
     CreateNative("FileNet_IsFileInWaitingList", Native_IsFileInWaitingList);
-
+    CreateNative("FileNet_GetNetChanPtr", Native_GetNetChanPtr);
+	
     RegPluginLibrary("filenetwork");
     return APLRes_Success;
 }
