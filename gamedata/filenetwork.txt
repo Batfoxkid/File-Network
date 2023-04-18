@@ -4,7 +4,7 @@
 	{
 		"Keys"
 		{
-			"EngineInterface"	"VEngineServer021"
+			"EngineInterface"	"VEngineServer023"
 		}
 		"Signatures"
 		{
@@ -13,6 +13,108 @@
 				"library"	"engine"
 				"windows"	"@CreateInterface"
 				"linux"		"@CreateInterface"
+			}
+		}
+        "Offsets"
+        {
+            "GetPlayerNetInfo"
+            {
+                "windows"    "20"
+                "linux"      "20"
+            }
+        }
+	}
+
+	"csgo"
+	{
+		"Keys"
+		{
+			"EngineInterface"	"VEngineServer023"
+		}
+		"Signatures"
+		{
+			"CreateInterface"
+			{
+				"library"	"engine"
+				"windows"	"@CreateInterface"
+				"linux"		"@CreateInterface"
+			}
+			"CNetChan::SendFile"
+			{
+				"library"	"engine"
+				"windows"	"\x55\x8B\xEC\x57\x8B\xF9\x8B\x07\x8B\x80\x00\x01\x00\x00\xFF\xD0"
+				// "SendFile: %s (ID %i)\n"
+			}
+			"CNetChan::RequestFile"
+			{
+				"library"	"engine"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x3C\x56\x8B\xF1\xFF\x86\x90\x04\x00\x00\x8B\x0D"
+				// "RequestFile: %s (ID %i)\n"
+			}
+			"CNetChan::IsFileInWaitingList"
+			{
+				"library"	"engine"
+				"windows"	"\x55\x8B\xEC\x51\x56\x8B\x75\x08\x8B\xC1\x56"
+				// "CreateFragmentsFromFile: '%s' doesn't e" -> CNetChan::CreateFragmentsFromFile
+				// Top Call -> CNetChan::IsFileInWaitingList
+			}
+			"CGameClient::FileReceived"
+			{
+				"library"	"engine"
+
+				"windows"	"\x55\x8B\xEC\x56\x8B\x75\x0C\x33\xD2\x57\x8B\xF9"
+				// "CGameClient::FileReceived: %s not wanted.\n"
+			}
+			"CGameClient::FileDenied"
+			{
+				"library"	"engine"
+				"windows"	"\x55\x8B\xEC\x8B\x01\xFF\x50\x4C\x50\x2A\x2A\x2A\x2A\x80"
+				// "Downloading file '%s' from client %s failed.\n"
+			}
+			"CBaseClient::GetNetChannel"
+			{
+				"library"	"engine"
+				"windows"	"\x8B\x81\xC0\x00\x00\x00"
+				// Good Luck
+			}
+		}
+		"Functions"
+		{
+			"CGameClient::FileReceived"
+			{
+				"signature"	"CGameClient::FileReceived"
+				"callconv"	"thiscall"
+				"return"	"void"
+				"this"		"address"
+				"arguments"
+				{
+					"fileName"
+					{
+						"type"	"charptr"
+					}
+					"transferID "
+					{
+						"type"	"int"
+					}
+				}
+			}
+			"CGameClient::FileDenied"
+			{
+				"signature"	"CGameClient::FileDenied"
+				"callconv"	"thiscall"
+				"return"	"void"
+				"this"		"address"
+				"arguments"
+				{
+					"fileName"
+					{
+						"type"	"charptr"
+					}
+					"transferID "
+					{
+						"type"	"int"
+					}
+				}
 			}
 		}
         "Offsets"
@@ -57,7 +159,7 @@
 			"CGameClient::FileReceived"
 			{
 				"library"	"engine"
-				"linux"		"@_ZN11CGameClient12FileReceivedEPKcj"
+				"linux"		"@_ZZN11CGameClient12FileReceivedEPKcj"
 				"windows"	"\x55\x8B\xEC\x56\x8B\x75\x0C\x33\xD2\x57\x8B\xF9"
 				// "CGameClient::FileReceived: %s not wanted.\n"
 			}
