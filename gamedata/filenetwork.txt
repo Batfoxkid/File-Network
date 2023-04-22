@@ -61,7 +61,7 @@
             "CGameClient::FileReceived"
             {
                 "library"	"engine"
-                "linux"		"@_ZZN11CGameClient12FileReceivedEPKcj"
+                "linux"		"@_ZN11CGameClient12FileReceivedEPKcj"
                 "windows"	"\x55\x8B\xEC\x56\x8B\x75\x0C\x33\xD2\x57\x8B\xF9"
                 // "CGameClient::FileReceived: %s not wanted.\n"
             }
