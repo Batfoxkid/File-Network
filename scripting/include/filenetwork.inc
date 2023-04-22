@@ -109,7 +109,7 @@ native int FileNet_RequestFile(int client, const char[] file, FileNet_RequestFil
  * @param client	Client index
  * 
  * 
- * @return			Address of the CNetChan object on success, Address_Null otherwise
+ * @return			Address of the CNetChan object on success, Address_Null on failure or in CS:GO
  */
 native Address FileNet_GetNetChanPtr(int client);
 
