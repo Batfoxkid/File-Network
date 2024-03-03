@@ -7,6 +7,8 @@
 
 #define PLUGIN_VERSION	"manual"
 
+#define TIMEOUT_PERIOD	90	// How long until we consider a requested file to be timed out
+
 enum struct FileEnum
 {
 	int Client;
@@ -28,12 +30,14 @@ Address EngineAddress;
 // Sending
 int TransferID;
 ArrayList SendListing;
-bool InQuery[MAXPLAYERS+1];
 Handle SendingTimer[MAXPLAYERS+1];
 char CurrentlySending[MAXPLAYERS+1][PLATFORM_MAX_PATH];
 
 // Requesting
 ArrayList RequestListing;
+Handle RequestingTimer[MAXPLAYERS+1];
+int CurrentlyRequesting[MAXPLAYERS+1] = {-1, ...};
+int StartedRequestingAt[MAXPLAYERS+1];
 
 methodmap CNetChan
 {
@@ -48,7 +52,8 @@ methodmap CNetChan
 	}
 	public int RequestFile(const char[] filename)
 	{
-		return SDKCall(SDKRequestFile, this, filename);
+		int id = SDKCall(SDKRequestFile, this, filename);
+		return id;
 	}
 	public bool IsFileInWaitingList(const char[] filename)
 	{
@@ -268,7 +273,29 @@ public void OnClientDisconnect_Post(int client)
 
 	delete SendingTimer[client];
 	CurrentlySending[client][0] = 0;
+
+	delete RequestingTimer[client];
+	CurrentlyRequesting[client] = -1;
 }
+
+public void OnNotifyPluginUnloaded(Handle plugin)
+{
+	int match = -1;
+	while((match = SendListing.FindValue(plugin, FileEnum::Plugin)) != -1)
+	{
+		SendListing.Erase(match);
+	}
+
+	match = -1;
+	while((match = RequestListing.FindValue(plugin, FileEnum::Plugin)) != -1)
+	{
+		RequestListing.Erase(match);
+	}
+}
+
+/*
+	Requesting Files
+*/
 
 public MRESReturn OnFileReceived(Address address, DHookParam param)
 {
@@ -282,8 +309,15 @@ public MRESReturn OnFileReceived(Address address, DHookParam param)
 		RequestListing.GetArray(i, info);
 		if(info.Id == id && chan == CNetChan(info.Client))
 		{
+			if(CurrentlyRequesting[info.Client] == id)
+				CurrentlyRequesting[info.Client] = -1;
+			
 			RequestListing.Erase(i);
 			CallRequestFileFinish(info, true);
+
+			if(RequestingTimer[info.Client])
+				TriggerTimer(RequestingTimer[info.Client]);
+			
 			break;
 		}
 	}
@@ -302,12 +336,104 @@ public MRESReturn OnFileDenied(Address address, DHookParam param)
 		RequestListing.GetArray(i, info);
 		if(info.Id == id && chan == CNetChan(info.Client))
 		{
+			if(CurrentlyRequesting[info.Client] == id)
+				CurrentlyRequesting[info.Client] = -1;
+			
 			RequestListing.Erase(i);
 			CallRequestFileFinish(info, false);
+
+			if(RequestingTimer[info.Client])
+				TriggerTimer(RequestingTimer[info.Client]);
+			
 			break;
 		}
 	}
 	return MRES_Ignored;
+}
+
+void StartRequestingClient(int client)
+{
+	if(!RequestingTimer[client])
+	{
+		RequestingTimer[client] = CreateTimer(1.0, Timer_RequestingClient, client, TIMER_REPEAT);
+		TriggerTimer(RequestingTimer[client]);
+	}
+}
+
+public Action Timer_RequestingClient(Handle timer, int client)
+{
+	CNetChan chan = CNetChan(client);
+	if(!chan)
+		return Plugin_Continue;
+	
+	static FileEnum info;
+	
+	if(CurrentlyRequesting[client] != -1)
+	{
+		// Client still giving this file
+		if((StartedRequestingAt[client] + TIMEOUT_PERIOD) > GetTime())
+			return Plugin_Continue;
+		
+		// We timed out, this can be a case of the client getting stuck.
+		// Request a different file to unstuck the client then try again.
+		DeleteFile("download/scripts/cheatcodes.txt");
+		
+		info.Client = client;
+		strcopy(info.Filename, sizeof(info.Filename), "scripts/cheatcodes.txt");
+		info.Func = INVALID_FUNCTION;
+		info.Id = chan.RequestFile(info.Filename);
+		RequestListing.PushArray(info);
+		
+		CurrentlyRequesting[client] = info.Id;
+		StartedRequestingAt[client] += 10;
+		return Plugin_Continue;
+	}
+
+	int length = RequestListing.Length;
+	for(int i; i < length; i++)
+	{
+		RequestListing.GetArray(i, info);
+		if(info.Client == client)
+		{
+			info.Id = chan.RequestFile(info.Filename);
+			RequestListing.SetArray(i, info);
+
+			CurrentlyRequesting[client] = info.Id;
+			StartedRequestingAt[client] = GetTime();
+			return Plugin_Continue;
+		}	
+	}
+
+	// No more files to send
+	RequestingTimer[client] = null;
+	return Plugin_Stop;
+}
+
+static void CallRequestFileFinish(const FileEnum info, bool success)
+{
+	if(info.Func && info.Func != INVALID_FUNCTION)
+	{
+		Call_StartFunction(info.Plugin, info.Func);
+		Call_PushCell(info.Client);
+		Call_PushString(info.Filename);
+		Call_PushCell(info.Id);
+		Call_PushCell(success);
+		Call_PushCell(info.Data);
+		Call_Finish();
+	}
+}
+
+/*
+	Sending Files
+*/
+
+void StartSendingClient(int client)
+{
+	if(!SendingTimer[client])
+	{
+		SendingTimer[client] = CreateTimer(0.1, Timer_SendingClient, client, TIMER_REPEAT);
+		TriggerTimer(SendingTimer[client]);
+	}
 }
 
 public Action Timer_SendingClient(Handle timer, int client)
@@ -320,22 +446,26 @@ public Action Timer_SendingClient(Handle timer, int client)
 	{
 		// Client still downloading this file
 		if(chan.IsFileInWaitingList(CurrentlySending[client]))
-			return Plugin_Continue;
-		
-		// We finished this file
-		int length = SendListing.Length;
-		for(int i; i < length; i++)
 		{
-			static FileEnum info;
-			SendListing.GetArray(i, info);
-			if(info.Client == client && StrEqual(info.Filename, CurrentlySending[client], false))
+			return Plugin_Continue;
+		}
+		else
+		{
+			// We finished this file
+			int length = SendListing.Length;
+			for(int i; i < length; i++)
 			{
-				SendListing.Erase(i);
-				CallSentFileFinish(info, true);
-				break;
+				static FileEnum info;
+				SendListing.GetArray(i, info);
+				if(info.Client == client && StrEqual(info.Filename, CurrentlySending[client], false))
+				{
+					SendListing.Erase(i);
+					CallSentFileFinish(info, true);
+					break;
+				}
 			}
 		}
-
+		
 		CurrentlySending[client][0] = 0;
 	}
 
@@ -379,49 +509,14 @@ static void CallSentFileFinish(const FileEnum info, bool success)
 	}
 }
 
-static void CallRequestFileFinish(const FileEnum info, bool success)
-{
-	if(info.Func && info.Func != INVALID_FUNCTION)
-	{
-		Call_StartFunction(info.Plugin, info.Func);
-		Call_PushCell(info.Client);
-		Call_PushString(info.Filename);
-		Call_PushCell(info.Id);
-		Call_PushCell(success);
-		Call_PushCell(info.Data);
-		Call_Finish();
-	}
-}
+/*
+	Natives
+*/
 
 void StartNative()
 {
 	if(!SendListing)
 		ThrowNativeError(SP_ERROR_NATIVE, "Please wait until OnAllPluginsLoaded");
-}
-
-void StartSendingClient(int client)
-{
-	// Clients need sv_allowupload in order for this to work, sorry CSGO fans
-	if(!InQuery[client] && QueryClientConVar(client, "sv_allowupload", QueryCallback) != QUERYCOOKIE_FAILED)
-		InQuery[client] = true;
-}
-
-public void QueryCallback(QueryCookie cookie, int client, ConVarQueryResult result, const char[] cvarName, const char[] cvarValue, any value)
-{
-	if(!SendingTimer[client] && IsClientInGame(client))
-	{
-		if(result == ConVarQuery_Okay && StringToInt(cvarValue))
-		{
-			SendingTimer[client] = CreateTimer(0.5, Timer_SendingClient, client, TIMER_REPEAT);
-			Timer_SendingClient(null, client);
-		}
-		else
-		{
-			PrintToChat(client, "[SM] The server is trying to send you a file, enable sv_allowupload to allow this process");
-		}
-	}
-
-	InQuery[client] = false;
 }
 
 int GetNativeClient(int param)
@@ -486,13 +581,10 @@ public any Native_RequestFile(Handle plugin, int params)
 	info.Func = GetNativeFunction(3);
 	info.Data = GetNativeCell(4);
 
-	CNetChan chan = CNetChan(info.Client);
-	if(!chan)
-		ThrowError("Native_RequestFile: Client address is invalid");
-	
-	info.Id = chan.RequestFile(info.Filename);
 	RequestListing.PushArray(info);
-	return info.Id;
+
+	StartRequestingClient(info.Client);
+	return CurrentlyRequesting[info.Client];
 }
 
 public any Native_IsFileInWaitingList(Handle plugin, int params)

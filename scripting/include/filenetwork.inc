@@ -99,9 +99,9 @@ native bool FileNet_SendFile(int client, const char[] file, FileNet_SendFileResu
  * 
  * @error			Invalid client index, client is not in game, or a fake client
  * 
- * @return			Unique request ID given by the engine per session
+ * @noreturn
  */
-native int FileNet_RequestFile(int client, const char[] file, FileNet_RequestFileResult callback = INVALID_FUNCTION, any data = 0);
+native void FileNet_RequestFile(int client, const char[] file, FileNet_RequestFileResult callback = INVALID_FUNCTION, any data = 0);
 
 /**
  * Gets the CNetChan object of a specific client
