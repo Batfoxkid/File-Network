@@ -32,7 +32,7 @@ typeset FileNet_SendFileResult
 };
 
 /**
- * Ccalled when file request is finished
+ * Called when file request is finished
  */
 typeset FileNet_RequestFileResult
 {
@@ -88,9 +88,6 @@ native bool FileNet_SendFile(int client, const char[] file, FileNet_SendFileResu
 
 /**
  * Requests a file to be sent from the client
- * 
- * @note	Callback may not always be called, this is due to missing callbacks for cases:
- * @note	In this case, the callback will only be called when the client disconnects
  * 
  * @param client	Client index
  * @param file		Filepath of requested file

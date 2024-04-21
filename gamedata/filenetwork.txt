@@ -11,72 +11,20 @@
 			"CreateInterface"
 			{
 				"library"	"engine"
-				"windows"	"@CreateInterface"
 				"linux"		"@CreateInterface"
+				"linux64"	"@CreateInterface"
+				"windows"	"@CreateInterface"
+				"windows64"	"@CreateInterface"
 			}
 		}
-        "Offsets"
-        {
-            "GetPlayerNetInfo"
-            {
-                "windows"    "20"
-                "linux"      "20"
-            }
-        }
-	}
-	"tf"
-	{
-		"Keys"
+		"Offsets"
 		{
-			"EngineInterface"	"VEngineServer023"
-		}
-		"Signatures"
-		{
-			"CNetChan::SendFile"
+			"GetPlayerNetInfo"
 			{
-				"library"	"engine"
-				"linux"		"@_ZN8CNetChan8SendFileEPKcj"
-				"windows"	"\x55\x8B\xEC\x57\x8B\xF9\x8D\x8F\x94\x00\x00\x00\xE8\x2A\x2A\x2A\x2A\x85\xC0\x75\x2A\xB0\x01\x5F\x5D\xC2\x08\x00"
-				// "SendFile: %s (ID %i)\n"
-			}
-			"CNetChan::RequestFile"
-			{
-				"library"	"engine"
-				"linux"		"@_ZN8CNetChan11RequestFileEPKc"
-				"windows"	"\x55\x8B\xEC\x83\xEC\x14\x53\x8B\xD9\x56\x89\x5D\xF8"
-				// "RequestFile: %s (ID %i)\n"
-			}
-			"CNetChan::IsFileInWaitingList"
-			{
-				"library"	"engine"
-				"linux"		"@_ZN8CNetChan19IsFileInWaitingListEPKc"
-				"windows"	"\x55\x8B\xEC\x8B\x45\x08\x83\xEC\x08\x85\xC0\x0F\x84\x2A\x2A\x2A\x2A\x80\x38\x00"
-				// "CreateFragmentsFromFile: '%s' doesn't e" -> CNetChan::CreateFragmentsFromFile
-				// Top Call -> CNetChan::IsFileInWaitingList
-				// inlined, unuseable.
-			}
-			"CGameClient::FileReceived"
-			{
-				"library"	"engine"
-				"linux"		"\x55\x31\xC0\x89\xE5\x53\x8B\x55\x08\x8B\x5D\x0C\x8B\x4D\x10\x39\x8C\xC2\xA4\x00\x00\x00" 
-				// cant use base words, need full sig for linux.
-				//"@_ZN11CGameClient12FileReceivedEPKcj"
-				"windows"	"\x55\x8B\xEC\x56\x8B\x75\x0C\x33\xD2\x57\x8B\xF9"
-				// "CGameClient::FileReceived: %s not wanted.\n"
-			}
-			"CGameClient::FileDenied"
-			{
-				"library"	"engine"
-				"linux"		"@_ZN11CGameClient10FileDeniedEPKcj"
-				"windows"	"\x55\x8B\xEC\x8B\x01\xFF\x50\x44\x50\xFF\x75\x08\x68"
-				// "Downloading file '%s' from client %s failed.\n"
-			}
-			"CBaseClient::GetNetChannel"
-			{
-				"library"	"engine"
-				"linux"		"@_ZN11CBaseClient13GetNetChannelEv"
-				"windows"	"\x8B\x81\xC0\x00\x00\x00"
-				// Good Luck
+				"linux"		"20"
+				"linux64"	"20"
+				"windows"	"20"
+				"windows64"	"20"
 			}
 		}
 		"Functions"
@@ -93,7 +41,7 @@
 					{
 						"type"	"charptr"
 					}
-					"transferID "
+					"transferID"
 					{
 						"type"	"int"
 					}
@@ -111,11 +59,83 @@
 					{
 						"type"	"charptr"
 					}
-					"transferID "
+					"transferID"
 					{
 						"type"	"int"
 					}
 				}
+			}
+		}
+	}
+	"tf"
+	{
+		"Keys"
+		{
+			"EngineInterface"	"VEngineServer023"
+		}
+		"Signatures"
+		{
+			"CNetChan::SendFile"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN8CNetChan8SendFileEPKcj"
+				"linux64"	"@_ZN8CNetChan8SendFileEPKcj"
+				"windows"	"\x55\x8B\xEC\x57\x8B\xF9\x8D\x8F\x94\x00\x00\x00\xE8\x2A\x2A\x2A\x2A\x85\xC0\x75\x2A\xB0\x01\x5F\x5D\xC2\x08\x00"
+				"windows64"	"\x48\x89\x5C\x24\x08\x48\x89\x74\x24\x10\x57\x48\x83\xEC\x20\x48\x8B\xF9\x41\x8B\xF0\x48\x81\xC1\xC0\x00\x00\x00"
+				// "SendFile: %s (ID %i)\n"
+			}
+			"CNetChan::RequestFile"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN8CNetChan11RequestFileEPKc"
+				"linux64"	"@_ZN8CNetChan11RequestFileEPKc"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x14\x53\x8B\xD9\x56\x89\x5D\xF8"
+				"windows64"	"\x40\x55\x56\x48\x83\xEC\x28\x44\x8B\x81\xB8\x04\x00\x00"
+				// "RequestFile: %s (ID %i)\n"
+			}
+			"CNetChan::IsFileInWaitingList"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN8CNetChan19IsFileInWaitingListEPKc"
+				"linux64"	"@_ZN8CNetChan19IsFileInWaitingListEPKc"
+				// "CreateFragmentsFromFile: '%s' doesn't e" -> CNetChan::CreateFragmentsFromFile
+				// Top Call -> CNetChan::IsFileInWaitingList
+			}
+			"CNetChan::CreateFragmentsFromFile"
+			{
+				"library"	"engine"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x0C\x53\x8B\x5D\x08\x8B\xD1"
+				"windows64"	"\x48\x89\x5C\x24\x08\x48\x89\x6C\x24\x18\x56\x57\x41\x54\x41\x56\x41\x57\x48\x83\xEC\x20\x4D\x63\xF8"
+				// "CreateFragmentsFromFile: '%s' doesn't e"
+			}
+			"CGameClient::FileReceived"
+			{
+				"library"	"engine"
+				"linux"		"\x55\x31\xC0\x89\xE5\x53\x8B\x55\x08\x8B\x5D\x0C\x8B\x4D\x10\x39\x8C\xC2\xA4\x00\x00\x00" 
+				"linux64"	"\x48\x8D\x87\xC0\x00\x00\x00\x48\x8D\x8F\xE0\x00\x00\x00"
+				// cant use base words, need full sig for linux.
+				//"@_ZN11CGameClient12FileReceivedEPKcj"
+				"windows"	"\x55\x8B\xEC\x56\x8B\x75\x0C\x33\xD2\x57\x8B\xF9"
+				"windows64"	"\x4C\x8B\xD2\x48\x8D\x81\xB8\x00\x00\x00"
+				// "CGameClient::FileReceived: %s not wanted.\n"
+			}
+			"CGameClient::FileDenied"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN11CGameClient10FileDeniedEPKcj"
+				"linux64"	"@_ZN11CGameClient10FileDeniedEPKcj"
+				"windows"	"\x55\x8B\xEC\x8B\x01\xFF\x50\x44\x50\xFF\x75\x08\x68"
+				"windows64"	"\x40\x53\x48\x83\xEC\x20\x48\x8B\x01\x48\x8B\xDA\xFF\x90\x88\x00\x00\x00\x48\x8B\xD3\x48\x8D\x0D\x14\x56\x26\x00"
+				// "Downloading file '%s' from client %s failed.\n"
+			}
+			"CBaseClient::GetNetChannel"
+			{
+				"library"	"engine"
+				"linux"		"@_ZN11CBaseClient13GetNetChannelEv"
+				"linux64"	"@_ZN11CBaseClient13GetNetChannelEv"
+				"windows"	"\x8B\x81\xC0\x00\x00\x00"
+				"windows64"	"\x48\x8B\x81\xD8\x00\x00\x00\xC3"
+				// Good Luck
 			}
 		}
 	}

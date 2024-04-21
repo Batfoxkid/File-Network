@@ -24,8 +24,10 @@ Handle SDKGetPlayerNetInfo;
 Handle SDKSendFile;
 Handle SDKRequestFile;
 Handle SDKIsFileInWaitingList;
+Handle SDKCreateFragmentsFromFile;
 Handle SDKGetNetChannel;
 Address EngineAddress;
+ConVar CvarMaxFileSize;
 
 // Sending
 int TransferID;
@@ -57,7 +59,21 @@ methodmap CNetChan
 	}
 	public bool IsFileInWaitingList(const char[] filename)
 	{
-		return SDKCall(SDKIsFileInWaitingList, this, filename);
+		bool result;
+
+		if(SDKIsFileInWaitingList)
+		{
+			result = SDKCall(SDKIsFileInWaitingList, this, filename);
+		}
+		else
+		{
+			int value = CvarMaxFileSize.IntValue;
+			CvarMaxFileSize.IntValue = -1;
+			result = SDKCall(SDKCreateFragmentsFromFile, this, filename, 0, 0);
+			CvarMaxFileSize.IntValue = value;
+		}
+
+		return result;
 	}
 }
 
@@ -147,8 +163,25 @@ public void OnPluginStart()
 	SDKIsFileInWaitingList = EndPrepSDKCall();
 	if(!SDKIsFileInWaitingList)
 	{
-		LogError("[Gamedata] Could not find CNetChan::IsFileInWaitingList");
-		failed = true;
+		CvarMaxFileSize = FindConVar("net_maxfilesize");
+		if(!CvarMaxFileSize)
+		{
+			LogError("[Game] Could not find net_maxfilesize");
+			failed = true;
+		}
+
+		StartPrepSDKCall(SDKCall_Raw);
+		PrepSDKCall_SetFromConf(gamedata, SDKConf_Signature, "CNetChan::CreateFragmentsFromFile");
+		PrepSDKCall_AddParameter(SDKType_String, SDKPass_Pointer);
+		PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+		PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
+		PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_ByValue);
+		SDKCreateFragmentsFromFile = EndPrepSDKCall();
+		if(!SDKCreateFragmentsFromFile)
+		{
+			LogError("[Gamedata] Could not find CNetChan::IsFileInWaitingList or CNetChan::CreateFragmentsFromFile");
+			failed = true;
+		}
 	}
 	
 	StartPrepSDKCall(SDKCall_Raw);
