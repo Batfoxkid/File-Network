@@ -111,8 +111,8 @@
 			"CGameClient::FileReceived"
 			{
 				"library"	"engine"
-				"linux"		"\x55\x31\xC0\x89\xE5\x53\x8B\x55\x08\x8B\x5D\x0C\x8B\x4D\x10\x39\x8C\xC2\xA4\x00\x00\x00" 
-				"linux64"	"\x48\x8D\x87\xC0\x00\x00\x00\x48\x8D\x8F\xE0\x00\x00\x00"
+				"linux"		"@_ZN11CGameClient12FileReceivedEPKcj" 
+				"linux64"	"@_ZN11CGameClient12FileReceivedEPKcj" 
 				// cant use base words, need full sig for linux.
 				//"@_ZN11CGameClient12FileReceivedEPKcj"
 				"windows"	"\x55\x8B\xEC\x56\x8B\x75\x0C\x33\xD2\x57\x8B\xF9"
