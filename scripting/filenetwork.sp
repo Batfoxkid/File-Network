@@ -80,7 +80,7 @@ methodmap CNetChan
 public Plugin myinfo =
 {
 	name		=	"File Network",
-	author		=	"Batfoxkid",
+	author		=	"Batfoxkid, Artvin",
 	description	=	"But what if, no loading screen",
 	version		=	PLUGIN_VERSION,
 	url			=	"github.com/Batfoxkid/File-Network"
@@ -211,6 +211,8 @@ public void OnPluginStart()
 		failed = true;
 	}
 
+	//THIS ONLY WORKS ON WINDOWS!!!!!!
+	//linux uses a different solution, timeout logic.
 	detour = DynamicDetour.FromConf(gamedata, "CGameClient::FileDenied");
 	if(detour)
 	{
@@ -357,33 +359,6 @@ public MRESReturn OnFileReceived(Address address, DHookParam param)
 	return MRES_Ignored;
 }
 
-public MRESReturn OnFileDenied(Address address, DHookParam param)
-{
-	int id = param.Get(2);
-	CNetChan chan = SDKCall(SDKGetNetChannel, address);
-
-	int length = RequestListing.Length;
-	for(int i; i < length; i++)
-	{
-		static FileEnum info;
-		RequestListing.GetArray(i, info);
-		if(info.Id == id && chan == CNetChan(info.Client))
-		{
-			if(CurrentlyRequesting[info.Client] == id)
-				CurrentlyRequesting[info.Client] = -1;
-			
-			RequestListing.Erase(i);
-			CallRequestFileFinish(info, false);
-
-			if(RequestingTimer[info.Client])
-				TriggerTimer(RequestingTimer[info.Client]);
-			
-			break;
-		}
-	}
-	return MRES_Ignored;
-}
-
 void StartRequestingClient(int client)
 {
 	if(!RequestingTimer[client])
@@ -433,6 +408,13 @@ public Action Timer_RequestingClient(Handle timer, int client)
 
 			CurrentlyRequesting[client] = info.Id;
 			StartedRequestingAt[client] = GetTime();
+			float CurrentClientPing = GetClientAvgLatency(client, NetFlow_Outgoing);
+			CurrentClientPing *= 2.0; //beacuse it has to go bothways.
+			CurrentClientPing += 0.2; //Little buffer for ping issues and differences
+			Handle pack;
+			CreateDataTimer(CurrentClientPing, Timer_DeniedFileCheck, pack);
+			WritePackCell(pack, client); //Client
+			WritePackCell(pack, info.Id); //The id that we ask for
 			return Plugin_Continue;
 		}	
 	}
@@ -442,6 +424,46 @@ public Action Timer_RequestingClient(Handle timer, int client)
 	return Plugin_Stop;
 }
 
+public Action Timer_DeniedFileCheck(Handle timer, DataPack pack)
+{
+	pack.Reset();
+	int client = pack.ReadCell();
+	int id = pack.ReadCell();
+	//We can presume the client didnt recieve the file if recieving didnt work out.
+	OnFileDeniedInternal(CNetChan(client), id);
+	return Plugin_Stop;
+}
+
+public MRESReturn OnFileDenied(Address address, DHookParam param)
+{
+	int id = param.Get(2);
+	CNetChan chan = SDKCall(SDKGetNetChannel, address);
+	OnFileDeniedInternal(chan, id);
+	return MRES_Ignored;
+}
+
+void OnFileDeniedInternal(CNetChan chan, int id)
+{
+	int length = RequestListing.Length;
+	for(int i; i < length; i++)
+	{
+		static FileEnum info;
+		RequestListing.GetArray(i, info);
+		if(info.Id == id && chan == CNetChan(info.Client))
+		{
+			if(CurrentlyRequesting[info.Client] == id)
+				CurrentlyRequesting[info.Client] = -1;
+			
+			RequestListing.Erase(i);
+			CallRequestFileFinish(info, false);
+
+			if(RequestingTimer[info.Client])
+				TriggerTimer(RequestingTimer[info.Client]);
+			
+			break;
+		}
+	}
+}
 static void CallRequestFileFinish(const FileEnum info, bool success)
 {
 	if(info.Func && info.Func != INVALID_FUNCTION)
