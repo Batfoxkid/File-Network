@@ -18,6 +18,7 @@ enum struct FileEnum
 	any Data;
 
 	int Id;
+	int Timeout;
 }
 
 Handle SDKGetPlayerNetInfo;
@@ -39,7 +40,7 @@ char CurrentlySending[MAXPLAYERS+1][PLATFORM_MAX_PATH];
 ArrayList RequestListing;
 Handle RequestingTimer[MAXPLAYERS+1];
 int CurrentlyRequesting[MAXPLAYERS+1] = {-1, ...};
-int StartedRequestingAt[MAXPLAYERS+1];
+int FailRequestingAt[MAXPLAYERS+1];
 
 methodmap CNetChan
 {
@@ -211,8 +212,6 @@ public void OnPluginStart()
 		failed = true;
 	}
 
-	//THIS ONLY WORKS ON WINDOWS!!!!!!
-	//linux uses a different solution, timeout logic.
 	detour = DynamicDetour.FromConf(gamedata, "CGameClient::FileDenied");
 	if(detour)
 	{
@@ -349,9 +348,9 @@ public MRESReturn OnFileReceived(Address address, DHookParam param)
 			
 			RequestListing.Erase(i);
 			CallRequestFileFinish(info, true);
-
-			if(RequestingTimer[info.Client])
-				TriggerTimer(RequestingTimer[info.Client]);
+			
+			delete RequestingTimer[info.Client];
+			SendNextRequest(info.Client);
 			
 			break;
 		}
@@ -359,91 +358,11 @@ public MRESReturn OnFileReceived(Address address, DHookParam param)
 	return MRES_Ignored;
 }
 
-void StartRequestingClient(int client)
-{
-	if(!RequestingTimer[client])
-	{
-		RequestingTimer[client] = CreateTimer(1.0, Timer_RequestingClient, client, TIMER_REPEAT);
-		TriggerTimer(RequestingTimer[client]);
-	}
-}
-
-public Action Timer_RequestingClient(Handle timer, int client)
-{
-	CNetChan chan = CNetChan(client);
-	if(!chan)
-		return Plugin_Continue;
-	
-	static FileEnum info;
-	
-	if(CurrentlyRequesting[client] != -1)
-	{
-		// Client still giving this file
-		if((StartedRequestingAt[client] + TIMEOUT_PERIOD) > GetTime())
-			return Plugin_Continue;
-		
-		// We timed out, this can be a case of the client getting stuck.
-		// Request a different file to unstuck the client then try again.
-		DeleteFile("download/scripts/cheatcodes.txt");
-		
-		info.Client = client;
-		strcopy(info.Filename, sizeof(info.Filename), "scripts/cheatcodes.txt");
-		info.Func = INVALID_FUNCTION;
-		info.Id = chan.RequestFile(info.Filename);
-		RequestListing.PushArray(info);
-		
-		CurrentlyRequesting[client] = info.Id;
-		StartedRequestingAt[client] += 10;
-		return Plugin_Continue;
-	}
-
-	int length = RequestListing.Length;
-	for(int i; i < length; i++)
-	{
-		RequestListing.GetArray(i, info);
-		if(info.Client == client)
-		{
-			info.Id = chan.RequestFile(info.Filename);
-			RequestListing.SetArray(i, info);
-
-			CurrentlyRequesting[client] = info.Id;
-			StartedRequestingAt[client] = GetTime();
-			float CurrentClientPing = GetClientAvgLatency(client, NetFlow_Outgoing);
-			CurrentClientPing *= 2.0; //beacuse it has to go bothways.
-			CurrentClientPing += 0.2; //Little buffer for ping issues and differences
-			Handle pack;
-			CreateDataTimer(CurrentClientPing, Timer_DeniedFileCheck, pack);
-			WritePackCell(pack, client); //Client
-			WritePackCell(pack, info.Id); //The id that we ask for
-			return Plugin_Continue;
-		}	
-	}
-
-	// No more files to send
-	RequestingTimer[client] = null;
-	return Plugin_Stop;
-}
-
-public Action Timer_DeniedFileCheck(Handle timer, DataPack pack)
-{
-	pack.Reset();
-	int client = pack.ReadCell();
-	int id = pack.ReadCell();
-	//We can presume the client didnt recieve the file if recieving didnt work out.
-	OnFileDeniedInternal(CNetChan(client), id);
-	return Plugin_Stop;
-}
-
 public MRESReturn OnFileDenied(Address address, DHookParam param)
 {
 	int id = param.Get(2);
 	CNetChan chan = SDKCall(SDKGetNetChannel, address);
-	OnFileDeniedInternal(chan, id);
-	return MRES_Ignored;
-}
 
-void OnFileDeniedInternal(CNetChan chan, int id)
-{
 	int length = RequestListing.Length;
 	for(int i; i < length; i++)
 	{
@@ -457,13 +376,117 @@ void OnFileDeniedInternal(CNetChan chan, int id)
 			RequestListing.Erase(i);
 			CallRequestFileFinish(info, false);
 
-			if(RequestingTimer[info.Client])
-				TriggerTimer(RequestingTimer[info.Client]);
+			delete RequestingTimer[info.Client];
+			SendNextRequest(info.Client);
 			
 			break;
 		}
 	}
+	return MRES_Ignored;
 }
+
+void StartRequestingClient(int client)
+{
+	// Small delay between requesting files, Linux Server issue
+	if(!RequestingTimer[client])
+		RequestingTimer[client] = CreateTimer(1.5, Timer_RequestingClient, client, TIMER_REPEAT);
+}
+
+void SendNextRequest(int client)
+{
+	if(CurrentlyRequesting[client] == -1)
+	{
+		CNetChan chan = CNetChan(client);
+		if(chan)
+		{
+			int length = RequestListing.Length;
+			for(int i; i < length; i++)
+			{
+				static FileEnum info;
+				RequestListing.GetArray(i, info);
+				if(info.Client == client)
+				{
+					info.Id = chan.RequestFile(info.Filename);
+					RequestListing.SetArray(i, info);
+
+					CurrentlyRequesting[client] = info.Id;
+					FailRequestingAt[client] = GetTime() + info.Timeout;
+					StartRequestingClient(client);
+					break;
+				}
+			}
+		}
+	}
+	else
+	{
+		StartRequestingClient(client);
+	}
+}
+
+public Action Timer_RequestingClient(Handle timer, int client)
+{
+	if(CurrentlyRequesting[client] == -1)
+	{
+		SendNextRequest(client);
+		return Plugin_Continue;
+	}
+	
+	// Client still giving this file
+	if(FailRequestingAt[client] > GetTime())
+		return Plugin_Continue;
+	
+	/*
+		We timed out!
+		
+		1. This can be a case of the client getting stuck from too many missing file requests.
+		2. A Linux server may not get the notice that the file was missing on the client.
+		
+		Request a different file that exists to fix issue 1,
+		fail and return the callback to fix issue 2.
+	*/
+	
+	CNetChan chan = CNetChan(client);
+	if(!chan)
+		return Plugin_Continue;
+	
+	static FileEnum info;
+	int length = RequestListing.Length;
+	for(int i; i < length; i++)
+	{
+		RequestListing.GetArray(i, info);
+		if(info.Id == CurrentlyRequesting[client] && info.Client == client)
+		{
+			CurrentlyRequesting[info.Client] = -1;
+			
+			RequestListing.Erase(i);
+			CallRequestFileFinish(info, false);
+			break;
+		}
+	}
+
+	if(info.Plugin == null)
+	{
+		// We already tried unstucking with this method, don't try it again
+		SendNextRequest(client);
+	}
+	else
+	{
+		DeleteFile("download/scripts/cheatcodes.txt");
+		
+		info.Plugin = null;
+		info.Client = client;
+		strcopy(info.Filename, sizeof(info.Filename), "scripts/cheatcodes.txt");
+		info.Func = INVALID_FUNCTION;
+		info.Id = chan.RequestFile(info.Filename);
+		info.Timeout = 30;
+		RequestListing.PushArray(info);
+		
+		CurrentlyRequesting[client] = info.Id;
+		FailRequestingAt[client] = GetTime() + info.Timeout;
+	}
+	return Plugin_Continue;
+}
+
 static void CallRequestFileFinish(const FileEnum info, bool success)
 {
 	if(info.Func && info.Func != INVALID_FUNCTION)
@@ -635,6 +658,7 @@ public any Native_RequestFile(Handle plugin, int params)
 	info.Plugin = plugin;
 	info.Func = GetNativeFunction(3);
 	info.Data = GetNativeCell(4);
+	info.Timeout = params < 5 ? TIMEOUT_PERIOD : GetNativeCell(5);
 
 	RequestListing.PushArray(info);
 

@@ -93,12 +93,13 @@ native bool FileNet_SendFile(int client, const char[] file, FileNet_SendFileResu
  * @param file		Filepath of requested file
  * @param callback	Optional callback when file is done
  * @param data		Optional value to pass to the callback function
+ * @param timeout	Timeout period in seconds
  * 
  * @error			Invalid client index, client is not in game, or a fake client
  * 
  * @noreturn
  */
-native void FileNet_RequestFile(int client, const char[] file, FileNet_RequestFileResult callback = INVALID_FUNCTION, any data = 0);
+native void FileNet_RequestFile(int client, const char[] file, FileNet_RequestFileResult callback = INVALID_FUNCTION, any data = 0, int timeout = 90);
 
 /**
  * Gets the CNetChan object of a specific client
